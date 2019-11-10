@@ -77,9 +77,10 @@ def t_SLIT(t):
 def t_newline(t):
     r'[\n\r]+'
     t.lexer.lineno += 1
+    pass
 
 def t_error(t):
-    print("Illegal characters!")
+    print("Illegal characters: " + t.value[0])
     t.lexer.skip(1)
 
 def t_IDENT(t):
@@ -102,13 +103,3 @@ def t_comments(t):
     pass
 
 lexer = lex.lex()
-
-# with open('test/test2.ek', 'r') as content_file:
-#     content = content_file.read()
-#     lexer.input(content)
-
-#     while True:
-#         tok = lexer.token()
-#         if not tok:
-#             break
-#         print(tok)

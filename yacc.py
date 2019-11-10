@@ -1,6 +1,5 @@
 import ply.yacc as yacc
 import lexer
-import yaml
 
 tokens = lexer.tokens 
 
@@ -388,5 +387,4 @@ def p_vdecl(p):
 
 def parse(input_content):
     parser = yacc.yacc()
-    result = parser.parse(input_content)
-    return yaml.dump(result)
+    return parser.parse(input_content)

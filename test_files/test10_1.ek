@@ -1,0 +1,15 @@
+
+# check associativity of all left-to-right operators
+
+
+def void run (int $x) {
+    1 * 2 * 3;
+    1 / 2 / 3;
+    1 + 2 + 3;
+    1 - 2 - 3;
+    1 == 2 == 3;
+    1 < 2 < 3;
+    1 > 2 > 3;
+    1 && 2 && 3;
+    1 || 2 || 3;
+}
