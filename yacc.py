@@ -1,22 +1,43 @@
 import ply.yacc as yacc
 import lexer
+import yaml
+import json, sys
 
 tokens = lexer.tokens 
-
 
 #######
 # Parser
 #######
 
+class Func():
+    def __init__(self, name, return_type):
+        self.name = name
+        self.return_type = return_type
+    def to_json(self):
+        return json.dumps(self, default=lambda o: o.__dict__, 
+            sort_keys=True, 
+            indent=4)
+
+class CompilerException(Exception):
+    def __init__(self, m):
+        self.message = m
+
+funcs_declare = {} 
+variables = {}
+current_func_prefix = None
+
+logicOps = ["eq", "gt", "lt", "and", "or"]
+arithOps = ["add", "sub",  "mul", "div"]
+uOps = ["not", "minus"]
+
 precedence = (
-    ('right', 'ASSIGN'),
-    ('left', 'OR'),
-    ('left', 'AND'),
-    ('left', 'EQUAL'),
-    ('left', 'SMALLERTHAN', 'GREATERTHAN'), 
-    ('left', 'PLUS', 'MINUS'),
-    ('left', 'TIMES', 'DIVIDE'),
-    ('right', 'NEGATE'),
+     ('left', 'OR'),  
+     ('left', 'AND'),  
+     ('nonassoc', 'SMALLERTHAN', 'GREATERTHAN', 'EQUAL', 'ASSIGN'),  # Nonassociative operators
+     ('left', 'PLUS', 'MINUS'),
+     ('left', 'TIMES', 'DIVIDE'),
+     #('right', 'MINUS'),            # Unary minus operator
+     ('right', 'NEGATE'),            # Unary minus operator
  )
 
 def p_prog(p):
@@ -180,7 +201,6 @@ def p_exp0(p):
         p[0] = {
             "name": "funccall",
             "globid": p[1],
-            "params": p[3]
         }
 
 def p_exp1(p):
@@ -301,7 +321,8 @@ def p_lit1(p):
     '''
     p[0] = {
         "name": "flit",
-        "value": p[1]
+        "value": p[1],
+        "exptype": "float"
     }
 
 def p_lit2(p):
@@ -310,18 +331,29 @@ def p_lit2(p):
     '''
     p[0] = {
         "name": "lit",
-        "value": p[1]
+        "value": p[1],
+        "exptype": "int"
     }
 
 def p_true(p):
     '''
     true : TRUE
     '''
+    p[0] = {
+        "name": "lit",
+        "value": p[1] == "true",
+        "exptype": "bool"
+    }
 
 def p_false(p):
     '''
     false : FALSE
     '''
+    p[0] = {
+        "name": "lit",
+        "value": p[1] == "true",
+        "exptype": "bool"
+    }
 
 def p_globid(p):
     '''
@@ -385,6 +417,157 @@ def p_vdecl(p):
         "var": p[2]
     }
 
+def not_same_type(left_type, right_type):
+    ltype = left_type.split()[-1]
+    rtype = right_type.split()[-1]
+    return ltype != rtype
+
+def can_cast(cast_type, exp_type):
+    exp_type = exp_type.split()[-1] # get the type if exp_type is ref type
+    if cast_type == exp_type:
+        return True
+    elif cast_type in ["int", "cint", "float"] and exp_type in ["int", "cint", "float"]:
+        return True
+    elif cast_type == "bool" and exp_type == "bool":
+        return True
+    else:
+        return False
+
+def check_violation(node):
+    global funcs_declare
+    global current_func_prefix
+    global variables
+    global logicOps
+    global arithOps
+    global uOps
+
+    if type(node) is list:
+        for v in node:
+            check_violation(v)
+
+    elif type(node) is dict:
+        #Check: <vdecl> may not have void type.
+        #Check: a ref type may not contain a 'ref' or 'void' type.
+        if "node" in node:
+            if node["type"] == "void":
+                raise CompilerException("error: <vdecl> type cannot be void")
+            elif "noalias" not in node["type"]:
+                if "ref" in node["type"][3:] or "void" in node["type"][3:]:
+                    raise CompilerException("error: a ref type may not contain a 'ref' or 'void' type.")
+            elif "noalias" in node["type"]:
+                if "ref" in node["type"][11:] or "void" in node["type"][11:]:
+                    raise CompilerException("error: a ref type may not contain a 'ref' or 'void' type.")
+            if current_func_prefix != None:
+                variables[current_func_prefix+" "+node["var"]] = node["type"]
+            else:
+                variables[node["var"]] = node["type"]
+        
+        if "name" in node:
+            #store exptype in node
+            if node["name"] == "varval":
+                varval_key = current_func_prefix + " " + node["var"]
+                if varval_key not in variables:
+                    raise CompilerException("error: variable " + node["var"] + " has not been declared")
+                node["exptype"] = variables[varval_key]
+
+            #Check: ref var initializer must be a variable.
+            elif node["name"] == "vardeclstmt":
+                if "exp" not in node or "vdecl" not in node:
+                    raise CompilerException("error: ref var initializer must be a variable.")
+                elif "name" not in node["exp"]:
+                    raise CompilerException("error: ref var initializer must be a variable.")
+                elif "type" not in node["vdecl"]:
+                    raise CompilerException("error: ref var initializer must be a variable.")
+                elif node["vdecl"]["type"][0:3] == "ref" and node["exp"]["name"] != "varval":
+                    raise CompilerException("error: ref var initializer must be a variable.")
+
+            #Check: all functions must be declared before use
+            elif node["name"] == "funccall":
+                if node["globid"] not in funcs_declare:
+                    raise CompilerException("error: function " + node["globid"] + " has not been declared")
+                node["exptype"] = funcs_declare[node["globid"]].return_type
+
+            #Check: a function may not return a ref type.
+            #Check: all programs define the "run" function with the right type.
+            elif node["name"] == "func":
+                if node["globid"] == "run":
+                    if "run" in funcs_declare:
+                        raise CompilerException("error: run function should only declare once")
+                    elif node['ret_type'] != "int":
+                        raise CompilerException("error: run function should only return int type")
+                    elif "vdecls" in node:
+                        raise CompilerException("error: run function should take no arguments")
+                else:
+                    if "ref" in node['ret_type']:
+                        raise CompilerException("error: function cannot return ref type")
+                funcs_declare[node["globid"]] = Func(node["globid"], node['ret_type'])
+                current_func_prefix = node["ret_type"]+" "+node["globid"]
+
+            elif node["name"] == "extern":
+                funcs_declare[node["globid"]] = Func(node["globid"], node['ret_type'])
+
+        #visit children node
+        for k, v in node.items():
+            if v is list or dict:
+                check_violation(v)
+
+        #Check: the types on both sides of binops are the same
+        if "op" in node:
+            if node["op"] in logicOps:
+                if not_same_type(node["lhs"]["exptype"], node["rhs"]["exptype"]):
+                    raise CompilerException("error: the type on two sides do not match")
+                node["exptype"] = "bool"
+
+            elif node["op"] in arithOps:
+                if not_same_type(node["lhs"]["exptype"], node["rhs"]["exptype"]):
+                    raise CompilerException("error: the type on two sides do not match")
+                node["exptype"] = node["rhs"]["exptype"]
+
+            elif node["op"] in uOps:
+                node["exptype"] = node["exp"]["exptype"]
+
+        if "name" in node:
+            if node["name"] == "assign":
+                if current_func_prefix is not None:
+                    var_key = current_func_prefix + " " + node["var"]
+                else:
+                    var_key = node["var"]
+                if var_key not in variables:
+                    raise CompilerException("error: variable " + node["var"] + " has not been declared")
+                if not_same_type(variables[var_key], node["exp"]["exptype"]):
+                    raise CompilerException("error: the type on two sides do not match")
+            
+            elif node["name"] == "caststmt":
+                if can_cast(node["type"], node["exp"]["exptype"]):
+                    node["exptype"] = node["type"]
+                else:
+                    raise CompilerException("error: cannot cast {} to {}", node["exp"]["exptype"], node["type"])
+
+            elif node["name"] == "func":
+                for k, v in variables.copy().items():
+                    if k.startswith(current_func_prefix):
+                        variables.pop(k)
+                current_func_prefix = None
+
+def check_run():
+    global funcs_declare
+    if "run" not in funcs_declare:
+        raise CompilerException("error: run function should be declared once.")
+
 def parse(input_content):
     parser = yacc.yacc()
-    return parser.parse(input_content)
+    result = parser.parse(input_content)
+
+    exitcode=0
+    #Compiler reports a reasonable error message & exit code.
+    try:
+        check_violation(result)
+        check_run()
+    except CompilerException as e:
+        print(e.message)
+        exitcode=1
+
+    if exitcode == 0:
+        return yaml.dump(result)
+
+    print("exit code: "+str(exitcode))
