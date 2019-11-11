@@ -31,13 +31,14 @@ arithOps = ["add", "sub",  "mul", "div"]
 uOps = ["not", "minus"]
 
 precedence = (
-     ('left', 'OR'),  
-     ('left', 'AND'),  
-     ('nonassoc', 'SMALLERTHAN', 'GREATERTHAN', 'EQUAL', 'ASSIGN'),  # Nonassociative operators
-     ('left', 'PLUS', 'MINUS'),
-     ('left', 'TIMES', 'DIVIDE'),
-     #('right', 'MINUS'),            # Unary minus operator
-     ('right', 'NEGATE'),            # Unary minus operator
+    ('right', 'ASSIGN'),
+    ('left', 'OR'),
+    ('left', 'AND'),
+    ('left', 'EQUAL'),
+    ('left', 'SMALLERTHAN', 'GREATERTHAN'), 
+    ('left', 'PLUS', 'MINUS'),
+    ('left', 'TIMES', 'DIVIDE'),
+    ('right', 'NEGATE'),
  )
 
 def p_prog(p):
@@ -567,7 +568,9 @@ def parse(input_content):
         print(e.message)
         exitcode=1
 
-    if exitcode == 0:
-        return yaml.dump(result)
-
     print("exit code: "+str(exitcode))
+
+    if exitcode == 0:
+        return result
+
+    
