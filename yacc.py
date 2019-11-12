@@ -321,7 +321,7 @@ def p_lit1(p):
     lit : FNUMBER
     '''
     p[0] = {
-        "name": "flit",
+        "name": "lit",
         "value": p[1],
         "exptype": "float"
     }

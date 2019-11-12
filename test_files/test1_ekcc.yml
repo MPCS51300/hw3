@@ -1,0 +1,249 @@
+exit code: 0
+externs:
+  externs:
+  - globid: getarg
+    name: extern
+    ret_type: int
+    tdecls:
+      name: tdecls
+      types:
+      - int
+  - globid: getargf
+    name: extern
+    ret_type: float
+    tdecls:
+      name: tdecls
+      types:
+      - int
+  name: externs
+funcs:
+  funcs:
+  - blk:
+      contents:
+        name: stmts
+        stmts:
+        - cond:
+            exptype: bool
+            lhs:
+              exptype: int
+              name: varval
+              var: $n
+            name: binop
+            op: lt
+            rhs:
+              exptype: int
+              name: lit
+              value: 2
+          name: if
+          stmt:
+            cond:
+              exptype: bool
+              lhs:
+                exptype: int
+                name: varval
+                var: $n
+              name: binop
+              op: eq
+              rhs:
+                exptype: int
+                name: lit
+                value: 0
+            else_stmt:
+              exp:
+                exptype: int
+                name: lit
+                value: 1
+              name: ret
+            name: if
+            stmt:
+              exp:
+                exptype: int
+                name: lit
+                value: 0
+              name: ret
+        - exp:
+            exptype: int
+            globid: fib
+            name: funccall
+          name: vardeclstmt
+          vdecl:
+            node: vdecl
+            type: int
+            var: $a
+        - exp:
+            exptype: int
+            globid: fib
+            name: funccall
+          name: vardeclstmt
+          vdecl:
+            node: vdecl
+            type: int
+            var: $b
+        - exp:
+            exptype: int
+            lhs:
+              exptype: int
+              name: varval
+              var: $a
+            name: binop
+            op: add
+            rhs:
+              exptype: int
+              name: varval
+              var: $b
+          name: ret
+      name: blk
+    globid: fib
+    name: func
+    ret_type: int
+    vdecls:
+      name: vdecls
+      vars:
+      - node: vdecl
+        type: int
+        var: $n
+  - blk:
+      contents:
+        name: stmts
+        stmts:
+        - exp:
+            exp:
+              exptype: int
+              lhs:
+                exptype: ref int
+                name: varval
+                var: $n
+              name: binop
+              op: add
+              rhs:
+                exptype: int
+                name: lit
+                value: 1
+            name: assign
+            var: $n
+          name: expstmt
+      name: blk
+    globid: inc
+    name: func
+    ret_type: void
+    vdecls:
+      name: vdecls
+      vars:
+      - node: vdecl
+        type: ref int
+        var: $n
+  - blk:
+      contents:
+        name: stmts
+        stmts:
+        - cond:
+            exp:
+              exptype: bool
+              lhs:
+                exptype: ref int
+                name: varval
+                var: $n
+              name: binop
+              op: gt
+              rhs:
+                exptype: int
+                name: lit
+                value: 100
+            exptype: bool
+            name: uop
+            op: not
+          name: while
+          stmt:
+            contents:
+              name: stmts
+              stmts:
+              - exp:
+                  exp:
+                    exptype: int
+                    lhs:
+                      exptype: ref int
+                      lhs:
+                        exptype: ref int
+                        name: varval
+                        var: $n
+                      name: binop
+                      op: mul
+                      rhs:
+                        exptype: ref int
+                        name: varval
+                        var: $n
+                    name: binop
+                    op: sub
+                    rhs:
+                      exptype: int
+                      name: lit
+                      value: 2
+                  name: assign
+                  var: $n
+                name: expstmt
+            name: blk
+      name: blk
+    globid: things
+    name: func
+    ret_type: void
+    vdecls:
+      name: vdecls
+      vars:
+      - node: vdecl
+        type: ref int
+        var: $n
+  - blk:
+      contents:
+        name: stmts
+        stmts:
+        - name: printslit
+          string: 'fib(5):'
+        - exp:
+            exptype: int
+            globid: fib
+            name: funccall
+          name: vardeclstmt
+          vdecl:
+            node: vdecl
+            type: int
+            var: $val
+        - exp:
+            exptype: int
+            name: varval
+            var: $val
+          name: print
+        - name: printslit
+          string: 'fib(5)+1:'
+        - exp:
+            exptype: void
+            globid: inc
+            name: funccall
+          name: expstmt
+        - exp:
+            exptype: int
+            name: varval
+            var: $val
+          name: print
+        - name: printslit
+          string: 'something else:'
+        - exp:
+            exptype: void
+            globid: things
+            name: funccall
+          name: expstmt
+        - exp:
+            exptype: int
+            name: varval
+            var: $val
+          name: print
+        - exp:
+            exptype: int
+            name: lit
+            value: 0
+          name: ret
+      name: blk
+    globid: run
+    name: func
+    ret_type: int
+  name: funcs
+name: prog
