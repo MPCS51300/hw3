@@ -159,8 +159,8 @@ def p_stmt0(p):
         if len(p) == 8:
             p[0]["else_stmt"] = p[7]
     elif p[1] == "print":
-            p[0]["name"] = "print"
-            p[0]["exp"] = p[2]
+        p[0]["name"] = "print"
+        p[0]["exp"] = p[2]
 
 def p_stmt1(p):
     '''
