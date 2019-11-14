@@ -1,8 +1,7 @@
 from llvmlite import ir
+import llvmlite.binding as llvm
 import yaml
 
-variables = {} # track variables: key=current_function_variable_name, value:llvmlite_type
-current_func_prefix = None # track the current funtion
 
 #read print and printslit functions' IR
 with open("print.ll", "r") as input:  
@@ -37,8 +36,12 @@ def compile_ir(engine, llvm_ir):
     return mod
 
 #generate print function codes
-engine = create_execution_engine()
-print_module = compile_ir(engine, llvm_ir)
+# llvm.initialize()
+# llvm.initialize_native_target()
+# llvm.initialize_native_asmprinter() 
+
+# engine = create_execution_engine()
+# print_module = compile_ir(engine, llvm_ir)
 
 def generate_type(type):
     if type == "int":
@@ -76,13 +79,17 @@ def generate_externs(ast, module):
     for extern in ast["externs"]:
         generate_extern(extern, module)
 
-def generate_binop(ast, module, builder):
+def generate_binop(ast, module, builder, variables):
     op = ast["op"]
     exptype = ast["exptype"]
-    lhs = generate_exp(ast["lhs"], module, builder)
-    rhs = generate_exp(ast["rhs"], module, builder)
 
-    #todo: what if lhs, rhs is ref 
+    lhs = generate_exp(ast["lhs"], module, builder, variables)
+    rhs = generate_exp(ast["rhs"], module, builder, variables)
+    # load if it is a pointer
+    if lhs.type.is_pointer:
+        lhs = builder.load(lhs)
+    if rhs.type.is_pointer:
+        rhs = builder.load(rhs)
 
     if exptype == "bool":
         if op == "and":
@@ -90,21 +97,21 @@ def generate_binop(ast, module, builder):
         elif op == "or":
             return builder.or_(lhs, rhs)
         else:
-            if ast["lhs"]["exptype"] == "int": 
+            if "int" in ast["lhs"]["exptype"]: 
                 if op == "lt":
                     return builder.icmp_signed("<", lhs, rhs)
                 elif op == "gt":
                     return builder.icmp_signed(">", lhs, rhs)
                 elif op == "eq":
                     return builder.icmp_signed("==", lhs, rhs)
-            elif ast["lhs"]["exptype"] == "float":
+            elif "float" in ast["lhs"]["exptype"]:
                 if op == "lt":
                     return builder.fcmp_ordered("<", lhs, rhs)
                 elif op == "gt":
                     return builder.fcmp_ordered(">", lhs, rhs)
                 elif op == "eq":
                     return builder.fcmp_ordered("==", lhs, rhs)
-    elif exptype == "int":
+    elif "int" in exptype:
         if op == "add":
             return builder.add(lhs, rhs)
         elif op == "sub":
@@ -113,7 +120,7 @@ def generate_binop(ast, module, builder):
             return builder.mul(lhs, rhs)
         elif op == "div":
             return builder.udiv(lhs, rhs)
-    elif exptype == "float":
+    elif "float" in exptype:
         if op == "add":
             return builder.fadd(lhs, rhs)
         elif op == "sub":
@@ -125,132 +132,137 @@ def generate_binop(ast, module, builder):
     elif exptype == "void":
         pass
 
-def generate_uop(ast, module, builder):
+def generate_uop(ast, module, builder, variables):
     op = ast["op"]
     exptype = ast["exptype"]
     if op == "not":
-        return builder.not_(generate_exp(ast["exp"], module, builder))
+        return builder.not_(generate_exp(ast["exp"], module, builder, variables))
     elif op == "minus":
-        return builder.neg(generate_exp(ast["exp"], module, builder))
+        return builder.neg(generate_exp(ast["exp"], module, builder, variables))
         
 def generate_caststmt(ast, module, builder):
     typ = generate_type(ast["type"])
     return builder.bitcast(generate_exp(ast["exp"]), type)
 
-def generate_assign(ast, module, builder):
-    exp = generate_exp(ast["exp"], module, builder)
-    dest = variables[ast["var"]] # find the value of ast["var"] in variables
-    builder.store(exp, dest.as_pointer())
+def generate_assign(ast, module, builder, variables):
+    exp = generate_exp(ast["exp"], module, builder, variables)
+    builder.store(exp, variables[ast["var"]])
 
-def generate_funccall(ast, module, builder):
+def generate_funccall(ast, module, builder, variables):
     fn = module.get_global(ast["globid"])
     args = []
     if "params" not in ast or "exps" not in ast["params"]:
         pass
     else:
         for exp in ast["params"]["exps"]:
-            print("exp:", exp)
-            args.append(generate_exp(exp, module, builder))
+            args.append(generate_exp(exp, module, builder, variables))
     return builder.call(fn, args)
 
-def generate_exp(ast, module, builder):
+def generate_exp(ast, module, builder, variables):
     name = ast["name"]
     if name == "binop":
-        return generate_binop(ast, module, builder)
+        return generate_binop(ast, module, builder, variables)
     elif name == "caststmt":
         return generate_caststmt(ast, module, builder)
     elif name == "uop":
-        return generate_uop(ast, module, builder)
+        return generate_uop(ast, module, builder, variables)
     elif name == "lit":
         return ir.Constant(generate_type(ast["exptype"]), ast["value"])
     elif name == "varval":
-        current_variable = current_func_prefix + " " + ast["var"]
-        variables[current_variable] = ir.Constant(generate_type("int"), 0)
-        return variables[current_variable] # it should return the actual llvmlite type 
+        return variables[ast["var"]] 
     elif name == "assign":
-        return generate_assign(ast, module, builder)
+        return generate_assign(ast, module, builder, variables)
     elif name == "funccall":
-        return generate_funccall(ast, module, builder)
+        return generate_funccall(ast, module, builder, variables)
 
-def generate_stmt(ast, module, builder, func):
+def generate_stmt(ast, module, builder, func, variables):
     name = ast["name"]
     if name == "blk":
-        generate_blk(ast, module, builder)
+        generate_blk(ast, module, builder, func, variables)
     elif name == "if":
-        pred = generate_exp(ast["cond"], module, builder)
+        pred = generate_exp(ast["cond"], module, builder, variables)
         if "else_stmt" in ast:
             with builder.if_else(pred) as (then, otherwise):
                 with then:
-                    generate_stmt(ast["stmt"], module, builder)
+                    generate_stmt(ast["stmt"], module, builder, func, variables)
                 with otherwise:
-                    generate_stmt(ast["else_stmt"], module, builder)
+                    generate_stmt(ast["else_stmt"], module, builder, func, variables)
         else:
-            with builder.if_then(pred) as (then):
-                with then:
-                    generate_stmt(ast["stmt"], module, builder)
+            with builder.if_then(pred):
+                generate_stmt(ast["stmt"], module, builder, func, variables)
     elif name == "ret":
         if "exp" in ast:
-            generate_exp(ast["exp"], module, builder)
-    elif name == "vardeclstmt":  
-        var = builder.alloca(generate_type(ast["vdecl"]["type"], name = ast["vdecl"]["var"]))
-        builder.store(generate_exp(ast["exp"], module, builder), var)
+            exp = generate_exp(ast["exp"], module, builder, variables)
+            if exp.type.is_pointer:
+                builder.load(exp)
+            builder.ret(exp)
+        else:
+            builder.ret_void()
+    elif name == "vardeclstmt": 
+        variables[ast["vdecl"]["var"]] = builder.alloca(generate_type(ast["vdecl"]["type"]))
+        builder.store(generate_exp(ast["exp"], module, builder, variables), variables[ast["vdecl"]["var"]])
     elif name == "expstmt":
-        generate_exp(ast["exp"], module, builder)
+        generate_exp(ast["exp"], module, builder, variables)
     elif name == "while":
         loop_head = func.append_basic_block("loop.header")
         loop_body = func.append_basic_block("loop.body")
         loop_end = func.append_basic_block("loop.end")
         builder.branch(loop_head)
         builder.position_at_end(loop_head)
-        cond = generate_exp(ast["cond"], module, builder)
+        cond = generate_exp(ast["cond"], module, builder, variables)
         builder.cbranch(cond, loop_body, loop_end)
-        builder.position_at_end(loopbody)
+        builder.position_at_end(loop_body)
         #loop body
-        generate_stmt(ast["stmt"], module, builder, func)
+        generate_stmt(ast["stmt"], module, builder, func, variables)
         #jump to loop head
         builder.branch(loop_head)
         builder.position_at_end(loop_end)
-    elif name == "print":
-        args = []
-        args.append(generate_exp(ast["exp"], module, builder))
-        fn = print_module.get_global("print")
-        builder.call(fn, args)
-    elif name == "printslit":
-        args = []
-        args.append(generate_slit(ast["string"]))
-        fn = print_module.get_global("printslit")
-        builder.call(fn, args)
+    # elif name == "print":
+    #     args = []
+    #     args.append(generate_exp(ast["exp"], module, builder))
+    #     fn = print_module.get_global("print")
+    #     builder.call(fn, args)
+    # elif name == "printslit":
+    #     args = []
+    #     args.append(generate_slit(ast["string"]))
+    #     fn = print_module.get_global("printslit")
+    #     builder.call(fn, args)
 
-def generate_blk(ast, module, builder, func):
+def generate_blk(ast, module, builder, func, variables):
     if "contents" in ast:
         for stmt in ast["contents"]["stmts"]:
-            generate_stmt(stmt, module, builder, func)
+            generate_stmt(stmt, module, builder, func, variables)
 
 def generate_func(ast, module):
-    global current_func_prefix
-    if current_func_prefix == None:
-        current_func_prefix = ast["globid"]
-
-    args = []
+    args_types = [] # the types of args in llvmlite
+    args_names = [] # the names of args in llvmlite
+    variables = {}  # the local vairables in the current function, key: variable name, value: variable type
     ret_type = generate_type(ast["ret_type"])
     if "vdecls" in ast:
         for vdecl in ast["vdecls"]["vars"]:
-            args.append(generate_type(vdecl["type"]))
+            args_types.append(generate_type(vdecl["type"]))
+            args_names.append(vdecl["var"])
 
-    fnty = ir.FunctionType(ret_type, args)
+    # Adds function to module
+    fnty = ir.FunctionType(ret_type, args_types)
     func = ir.Function(module, fnty, name=ast["globid"])
 
-    # Now implement the function
+    # Adds entry block to the function
     entry_block = func.append_basic_block(name="entry")
     builder = ir.IRBuilder(entry_block)
-   
-    if "blk" in ast:
-        result = generate_blk(ast["blk"], module, builder, func)
+
+    # Allocates function arguments
+    for arg, name in zip(func.args, args_names):
+        if arg.type.is_pointer:
+            variables[name] = arg
+        else:
+            ptr = builder.alloca(arg.type)
+            variables[name]= ptr
+            builder.store(arg, ptr)
     
-    builder.ret(result)
-
-    current_func_prefix = None
-
+    if "blk" in ast:
+        result = generate_blk(ast["blk"], module, builder, func, variables)
+    
 def generate_funcs(ast, module):
     for func in ast["funcs"]:
         generate_func(func, module)
@@ -259,8 +271,7 @@ def convert(ast, module):
     if "externs" in ast:
         generate_externs(ast["externs"], module)
 
-    if "funcs" in ast:
-        generate_funcs(ast["funcs"], module)
+    generate_funcs(ast["funcs"], module)
 
 
 file = open("test_files/test1_ekcc.yml", "r") 

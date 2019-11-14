@@ -1,4 +1,3 @@
-exit code: 0
 externs:
   externs:
   - globid: getarg
@@ -65,6 +64,20 @@ funcs:
             exptype: int
             globid: fib
             name: funccall
+            params:
+              exps:
+              - exptype: int
+                lhs:
+                  exptype: int
+                  name: varval
+                  var: $n
+                name: binop
+                op: sub
+                rhs:
+                  exptype: int
+                  name: lit
+                  value: 1
+              name: exps
           name: vardeclstmt
           vdecl:
             node: vdecl
@@ -74,6 +87,20 @@ funcs:
             exptype: int
             globid: fib
             name: funccall
+            params:
+              exps:
+              - exptype: int
+                lhs:
+                  exptype: int
+                  name: varval
+                  var: $n
+                name: binop
+                op: sub
+                rhs:
+                  exptype: int
+                  name: lit
+                  value: 2
+              name: exps
           name: vardeclstmt
           vdecl:
             node: vdecl
@@ -202,6 +229,12 @@ funcs:
             exptype: int
             globid: fib
             name: funccall
+            params:
+              exps:
+              - exptype: int
+                name: lit
+                value: 5
+              name: exps
           name: vardeclstmt
           vdecl:
             node: vdecl
@@ -218,6 +251,12 @@ funcs:
             exptype: void
             globid: inc
             name: funccall
+            params:
+              exps:
+              - exptype: int
+                name: varval
+                var: $val
+              name: exps
           name: expstmt
         - exp:
             exptype: int
@@ -230,6 +269,12 @@ funcs:
             exptype: void
             globid: things
             name: funccall
+            params:
+              exps:
+              - exptype: int
+                name: varval
+                var: $val
+              name: exps
           name: expstmt
         - exp:
             exptype: int
