@@ -566,11 +566,8 @@ def parse(input_content):
         check_run()
     except CompilerException as e:
         print(e.message)
-        exitcode=1
+        return None
 
-    print("exit code: "+str(exitcode))
-
-    if exitcode == 0:
-        return result
+    return result
 
     

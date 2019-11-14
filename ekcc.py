@@ -26,6 +26,8 @@ parser.add_argument("-emit-llvm", action="store_true", default=False, help="gene
 parser.add_argument("-o", action="store", default=sys.stdout, help="set output file path")
 args, unknown = parser.parse_known_args()
 
+exitcode = 0
+
 if len(unknown) != 1:
     raise Exception("Usage: python3 ekcc.py <input_file>")
 elif args.emit_ast and args.emit_llvm:
@@ -33,9 +35,14 @@ elif args.emit_ast and args.emit_llvm:
 else:
     content = read_content(unknown[0])
     ast = yacc.parse(content)
+    if ast == None:
+        print("exit code: "+str(1))
+        sys.exit(1)
     if args.emit_ast:
         write_to_file(args.o,  yaml.dump(ast))
     ir = codeGen.generate_code(ast)
     ir = binding.compile_and_execute(ir)
     if args.emit_llvm:
         write_to_file(args.o,  ir)
+
+print("exit code: "+str(exitcode))
