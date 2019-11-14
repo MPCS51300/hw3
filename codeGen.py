@@ -7,42 +7,6 @@ import yaml
 with open("print.ll", "r") as input:  
     llvm_ir = input.read()
 
-def create_execution_engine():
-    """
-    Create an ExecutionEngine suitable for JIT code generation on
-    the host CPU.  The engine is reusable for an arbitrary number of
-    modules.
-    """
-    # Create a target machine representing the host
-    target = llvm.Target.from_default_triple()
-    target_machine = target.create_target_machine()
-    # And an execution engine with an empty backing module
-    backing_mod = llvm.parse_assembly("")
-    engine = llvm.create_mcjit_compiler(backing_mod, target_machine)
-    return engine
-
-
-def compile_ir(engine, llvm_ir):
-    """
-    Compile the LLVM IR string with the given engine.
-    The compiled module object is returned.
-    """
-    # Create a LLVM module object from the IR
-    mod = llvm.parse_assembly(llvm_ir)
-    mod.verify()
-    engine.add_module(mod)
-    engine.finalize_object()
-    engine.run_static_constructors()
-    return mod
-
-#generate print function codes
-# llvm.initialize()
-# llvm.initialize_native_target()
-# llvm.initialize_native_asmprinter() 
-
-# engine = create_execution_engine()
-# print_module = compile_ir(engine, llvm_ir)
-
 def generate_type(type):
     if type == "int":
         return ir.IntType(32)
@@ -262,22 +226,24 @@ def generate_func(ast, module):
     
     if "blk" in ast:
         result = generate_blk(ast["blk"], module, builder, func, variables)
+
+    # Returns void if return type is void
+    if ast["ret_type"] == "void":
+        builder.ret_void()
     
 def generate_funcs(ast, module):
     for func in ast["funcs"]:
         generate_func(func, module)
 
-def convert(ast, module):
+def generate_prog(ast, module):
     if "externs" in ast:
         generate_externs(ast["externs"], module)
 
     generate_funcs(ast["funcs"], module)
 
-
-file = open("test_files/test1_ekcc.yml", "r") 
-ast = yaml.load(file.read(), Loader=yaml.FullLoader)
-
-module = ir.Module(name="prog")
-convert(ast, module)
-print(module)
+# The function called by ekcc.py
+def generate_code(ast):
+    module = ir.Module(name="prog")
+    generate_prog(ast, module)
+    return module
 

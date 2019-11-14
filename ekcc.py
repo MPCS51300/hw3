@@ -1,6 +1,18 @@
 import argparse, sys
-import lexer, yacc
+import lexer, yacc, codeGen, binding
 import yaml
+
+def read_content(input_file):
+    with open(input_file, 'r') as input:  
+        content = input.read()
+        return content
+
+def write_to_file(output_file, content):
+    if isinstance(output_file, str):
+        with open(output_file, 'w') as output:  
+            output.write(content)
+    else:
+        output_file.write(content)
 
 parser = argparse.ArgumentParser(prog=sys.argv[0], 
                                  description='Compiler',
@@ -15,16 +27,15 @@ parser.add_argument("-o", action="store", default=sys.stdout, help="set output f
 args, unknown = parser.parse_known_args()
 
 if len(unknown) != 1:
-    raise ValueError("Usage: python3 ekcc.py <input_file>")
+    raise Exception("Usage: python3 ekcc.py <input_file>")
+elif args.emit_ast and args.emit_llvm:
+    raise Exception("Cannot emit_ast and emit_llvm at the same time")
 else:
-    if args.emit_ast == True:
-        with open(unknown[0], 'r') as input:  
-            content = input.read()
-            ast = yacc.parse(content)
-            ast_in_yaml = yaml.dump(ast)
-            output_file_path = args.o
-            if isinstance(args.o, str):
-                with open(output_file_path, 'w') as output:
-                    output.write(ast_in_yaml)
-            else:
-                args.o.write(ast_in_yaml)
+    content = read_content(unknown[0])
+    ast = yacc.parse(content)
+    if args.emit_ast:
+        write_to_file(args.o,  yaml.dump(ast))
+    ir = codeGen.generate_code(ast)
+    ir = binding.compile_and_execute(ir)
+    if args.emit_llvm:
+        write_to_file(args.o,  ir)
