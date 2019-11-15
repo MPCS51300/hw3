@@ -26,15 +26,47 @@ def generate_slit(string):
     c_str_val = ir.Constant(ir.ArrayType(ir.IntType(8), len(string)), bytearray(string.encode("utf8")))
     return c_str_val
 
-def generate_extern(ast, module):
-    args = []
-    ret_type = generate_type(ast["ret_type"])
-    if "tdecls" in ast:
-        for type in ast["tdecls"]["types"]:
-            args.append(generate_type(type))
+def generate_getarg(ast, module):
+    # Declare function
+    fnty = ir.FunctionType(generate_type("int"), [generate_type("int")])
+    func = ir.Function(module, fnty, name = "getarg")
+    entry = func.append_basic_block("entry")
+    builder = ir.IRBuilder(entry)
 
-    fnty = ir.FunctionType(ret_type, args)
-    func = ir.Function(module, fnty, name=ast["globid"])
+    # Implement getarg
+    arg = builder.alloca(generate_type("int"))
+    builder.store(func.args[0], arg)
+    arg_value = builder.load(arg)
+    builder.ret(arg_value)
+
+def generate_getargf(ast, module):
+    # Declare function
+    fnty = ir.FunctionType(generate_type("float"), [generate_type("int")])
+    func = ir.Function(module, fnty, name = "getargf")
+    entry = func.append_basic_block("entry")
+    builder = ir.IRBuilder(entry)
+
+    # Implement getargf
+    arg = builder.alloca(generate_type("int"))
+    builder.store(func.args[0], arg)
+    arg_value = builder.load(arg)
+    arg_value = builder.uitofp(arg_value, ir.FloatType())
+    builder.ret(arg_value)
+
+def generate_extern(ast, module):
+    if ast["globid"] == "getarg":
+        generate_getarg(ast, module)
+    elif ast["globid"] == "getargf":
+        generate_getargf(ast, module)
+    else:  
+        args = []
+        ret_type = generate_type(ast["ret_type"])
+        if "tdecls" in ast:
+            for typ in ast["tdecls"]["types"]:
+                args.append(generate_type(typ))
+
+        fnty = ir.FunctionType(ret_type, args)
+        func = ir.Function(module, fnty, name=ast["globid"])
 
 def generate_externs(ast, module):
     if "externs" in ast:
@@ -102,9 +134,20 @@ def generate_uop(ast, module, builder, variables):
     elif op == "minus":
         return builder.neg(generate_exp(ast["exp"], module, builder, variables))
         
-def generate_caststmt(ast, module, builder):
+def generate_caststmt(ast, module, builder, variables):
     typ = generate_type(ast["type"])
-    return builder.bitcast(generate_exp(ast["exp"]), type)
+    exp = generate_exp(ast["exp"], module, builder, variables)
+    if exp.type.is_pointer:
+        exp = builder.load(exp)
+    if ast["type"] == "int" and ast["exp"]["exptype"] == "int":
+        exp = builder.trunc(exp, ir.IntType(32))
+    elif ast["type"] == "int" and ast["exp"]["exptype"] == "float":
+        exp = builder.fptoui(exp, ir.IntType(32))
+    elif ast["type"] == "float" and ast["exp"]["exptype"] == "float":
+        exp = builder.fptrunc(exp, ir.FloatType())
+    elif ast["type"] == "float" and ast["exp"]["exptype"] == "int":
+        exp = builder.uitofp(exp, ir.FloatType())
+    return exp
 
 def generate_assign(ast, module, builder, variables):
     exp = generate_exp(ast["exp"], module, builder, variables)
@@ -125,7 +168,7 @@ def generate_exp(ast, module, builder, variables):
     if name == "binop":
         return generate_binop(ast, module, builder, variables)
     elif name == "caststmt":
-        return generate_caststmt(ast, module, builder)
+        return generate_caststmt(ast, module, builder, variables)
     elif name == "uop":
         return generate_uop(ast, module, builder, variables)
     elif name == "lit":
@@ -240,13 +283,17 @@ def generate_func(ast, module):
     
     if "blk" in ast:
         result = generate_blk(ast["blk"], module, builder, func, variables)
+
+    # Returns void if return type is void
+    if ast["ret_type"] == "void":
+        builder.ret_void()
     
 def generate_funcs(ast, module):
     for func in ast["funcs"]:
         generate_func(func, module)
 
 def generate_prog(ast, module):
-    if "externs" in ast:
+    if "externs" in ast and len(ast) > 1:
         generate_externs(ast["externs"], module)
 
     generate_funcs(ast["funcs"], module)

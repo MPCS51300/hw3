@@ -25,6 +25,19 @@ def void things (ref int $n) {
 }
 
 def int run () {
+    float $a = getargf(0);
+    float $b = getargf(1);
+    int $c = getarg(2);
+    print $a;
+    print $b;
+    print $c;
+
+    int $d = [int] $a;
+    print $d;
+
+    float $e = [float] $c;
+    print $e;
+
     int $val = fib(5);
     inc($val);
     things($val);
