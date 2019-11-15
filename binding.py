@@ -48,5 +48,4 @@ def compile_and_execute(llvm_ir):
     # Run the function via ctypes
     cfunc = CFUNCTYPE(c_int)(func_ptr)
     res = cfunc()
-
     return mod

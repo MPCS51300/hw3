@@ -180,25 +180,25 @@ def generate_stmt(ast, module, builder, func, variables):
         builder.position_at_end(loop_end)
     elif name == "print":
         value = generate_exp(ast["exp"], module, builder, variables)
-        # Declare argument list
-        voidptr_ty = ir.IntType(8).as_pointer()
+        if value.type.is_pointer:
+            value = builder.load(value)
+        printf_func = module.get_global("printf")
         global_fmt = module.get_global("fstr_int")
+        voidptr_ty = ir.IntType(8).as_pointer()
         fmt_arg = builder.bitcast(global_fmt, voidptr_ty)
-        fn = module.get_global("print")
-        # Call print Function
-        builder.call(fn, [fmt_arg, value])
+        #call printf function
+        builder.call(printf_func, [fmt_arg, value])
     elif name == "printslit":
         # construct c_str
         c_str_val = generate_slit(ast["string"])
         c_str = builder.alloca(c_str_val.type)
         builder.store(c_str_val, c_str)
-        # Declare argument list
+        printf_func = module.get_global("printf")
+        global_fmt = module.get_global("fstr_int")
         voidptr_ty = ir.IntType(8).as_pointer()
-        global_fmt = module.get_global("fstr_slit")
         fmt_arg = builder.bitcast(global_fmt, voidptr_ty)
-        fn = module.get_global("printslit")
         # Call print Function
-        builder.call(fn, [fmt_arg, c_str])
+        builder.call(printf_func, [fmt_arg, builder.load(c_str)])
 
 def generate_blk(ast, module, builder, func, variables):
     if "contents" in ast:
@@ -249,24 +249,20 @@ def generate_prog(ast, module):
 
     generate_funcs(ast["funcs"], module)
 
-def declare_print_function(module):
-    # Declare print function
+def declare_printf(module):
+    #declare printf
     voidptr_ty = ir.IntType(8).as_pointer()
     printf_ty = ir.FunctionType(ir.IntType(32), [voidptr_ty], var_arg=True)
-    print_func = ir.Function(module, printf_ty, name="print")
-    #type 1
-    fmt1 = "%d\0"
+    printf = ir.Function(module, printf_ty, name="printf")
+    #int type
+    fmt1 = "%d\n\0"
     c_fmt1 = ir.Constant(ir.ArrayType(ir.IntType(8), len(fmt1)), bytearray(fmt1.encode("utf8")))
     global_fmt1 = ir.GlobalVariable(module, c_fmt1.type, name="fstr_int")
     global_fmt1.linkage = 'internal'
     global_fmt1.global_constant = True
     global_fmt1.initializer = c_fmt1
-    # Declare printslit function
-    voidptr_ty = ir.IntType(8).as_pointer()
-    printf_ty = ir.FunctionType(ir.PointerType(ir.IntType(8)), [voidptr_ty], var_arg=True)
-    print_func = ir.Function(module, printf_ty, name="printslit")
-    #type 2
-    fmt2 = "%s\0"
+    #slit type
+    fmt2 = "%s\n\0"
     c_fmt2 = ir.Constant(ir.ArrayType(ir.IntType(8), len(fmt2)), bytearray(fmt2.encode("utf8")))
     global_fmt2 = ir.GlobalVariable(module, c_fmt2.type, name="fstr_slit")
     global_fmt2.linkage = 'internal'
@@ -276,7 +272,7 @@ def declare_print_function(module):
 # The function called by ekcc.py
 def generate_code(ast):
     module = ir.Module(name="prog")
-    declare_print_function(module)
+    declare_printf(module)
     generate_prog(ast, module)
     return module
 
