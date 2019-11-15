@@ -182,6 +182,11 @@ def generate_stmt(ast, module, builder, func, variables):
         value = generate_exp(ast["exp"], module, builder, variables)
         if value.type.is_pointer:
             value = builder.load(value)
+        elif value.type == ir.IntType(1):
+            if value.constant == True:
+                value = ir.Constant(generate_type("int"), 1)
+            else:
+                value = ir.Constant(generate_type("int"), 0)
         printf_func = module.get_global("printf")
         global_fmt = module.get_global("fstr_int")
         voidptr_ty = ir.IntType(8).as_pointer()
