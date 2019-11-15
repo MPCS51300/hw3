@@ -37,8 +37,9 @@ def generate_extern(ast, module):
     func = ir.Function(module, fnty, name=ast["globid"])
 
 def generate_externs(ast, module):
-    for extern in ast["externs"]:
-        generate_extern(extern, module)
+    if "externs" in ast:
+        for extern in ast["externs"]:
+            generate_extern(extern, module)
 
 def generate_binop(ast, module, builder, variables):
     op = ast["op"]
@@ -239,10 +240,6 @@ def generate_func(ast, module):
     
     if "blk" in ast:
         result = generate_blk(ast["blk"], module, builder, func, variables)
-
-    # Returns void if return type is void
-    if ast["ret_type"] == "void":
-        builder.ret_void()
     
 def generate_funcs(ast, module):
     for func in ast["funcs"]:

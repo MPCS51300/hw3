@@ -10,9 +10,10 @@ tokens = lexer.tokens
 #######
 
 class Func():
-    def __init__(self, name, return_type):
+    def __init__(self, name, return_type, args):
         self.name = name
         self.return_type = return_type
+        self.args = args
     def to_json(self):
         return json.dumps(self, default=lambda o: o.__dict__, 
             sort_keys=True, 
@@ -486,11 +487,16 @@ def check_violation(node):
             elif node["name"] == "funccall":
                 if node["globid"] not in funcs_declare:
                     raise CompilerException("error: function " + node["globid"] + " has not been declared")
+                if "params" in node and "exps" in node["params"]:
+                    for x in range(len(node["params"]["exps"])):
+                        if "ref" in funcs_declare[node["globid"]].args[x] and node["params"]["exps"][x]["name"] != "varval":
+                            raise CompilerException("error: ref var initializer must be a variable.")
                 node["exptype"] = funcs_declare[node["globid"]].return_type
 
             #Check: a function may not return a ref type.
             #Check: all programs define the "run" function with the right type.
             elif node["name"] == "func":
+                args=[]
                 if node["globid"] == "run":
                     if "run" in funcs_declare:
                         raise CompilerException("error: run function should only declare once")
@@ -501,11 +507,17 @@ def check_violation(node):
                 else:
                     if "ref" in node['ret_type']:
                         raise CompilerException("error: function cannot return ref type")
-                funcs_declare[node["globid"]] = Func(node["globid"], node['ret_type'])
+                    if "vdecls" in node:
+                        for arg in node["vdecls"]["vars"]:
+                            args.append(arg["type"])
+                funcs_declare[node["globid"]] = Func(node["globid"], node['ret_type'], args)
                 current_func_prefix = node["ret_type"]+" "+node["globid"]
 
             elif node["name"] == "extern":
-                funcs_declare[node["globid"]] = Func(node["globid"], node['ret_type'])
+                args=[]
+                if "tdecls" in node and "types" in node["tdecls"]:
+                    args = node["tdecls"]["types"]
+                funcs_declare[node["globid"]] = Func(node["globid"], node['ret_type'], args)
 
         #visit children node
         for k, v in node.items():
