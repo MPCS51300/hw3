@@ -194,11 +194,11 @@ def generate_stmt(ast, module, builder, func, variables):
         c_str = builder.alloca(c_str_val.type)
         builder.store(c_str_val, c_str)
         printf_func = module.get_global("printf")
-        global_fmt = module.get_global("fstr_int")
+        global_fmt = module.get_global("fstr_slit")
         voidptr_ty = ir.IntType(8).as_pointer()
         fmt_arg = builder.bitcast(global_fmt, voidptr_ty)
         # Call print Function
-        builder.call(printf_func, [fmt_arg, builder.load(c_str)])
+        builder.call(printf_func, [fmt_arg, c_str])
 
 def generate_blk(ast, module, builder, func, variables):
     if "contents" in ast:
