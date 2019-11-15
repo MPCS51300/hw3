@@ -45,7 +45,6 @@ def compile_and_execute(llvm_ir):
 
     # Look up the function pointer (a Python int)
     func_ptr = engine.get_function_address("run")
-
     # Run the function via ctypes
     cfunc = CFUNCTYPE(c_int)(func_ptr)
     res = cfunc()

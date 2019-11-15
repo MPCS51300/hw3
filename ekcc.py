@@ -40,9 +40,10 @@ else:
         sys.exit(1)
     if args.emit_ast:
         write_to_file(args.o,  yaml.dump(ast))
-    ir = codeGen.generate_code(ast)
-    ir = binding.compile_and_execute(ir)
+    mod = codeGen.generate_code(ast)
+    #print(mod)
+    mod = binding.compile_and_execute(mod)
     if args.emit_llvm:
-        write_to_file(args.o,  ir)
+        write_to_file(args.o, mod)
 
 print("exit code: "+str(exitcode))
