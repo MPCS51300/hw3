@@ -190,7 +190,7 @@ def generate_stmt(ast, module, builder, func, variables):
         builder.call(printf_func, [fmt_arg, value])
     elif name == "printslit":
         # construct c_str
-        c_str_val = generate_slit(ast["string"])
+        c_str_val = generate_slit(ast["string"]+"\0")
         c_str = builder.alloca(c_str_val.type)
         builder.store(c_str_val, c_str)
         printf_func = module.get_global("printf")

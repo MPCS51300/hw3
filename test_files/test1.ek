@@ -29,7 +29,9 @@ def int run () {
     inc($val);
     things($val);
     print $val;
-    print "hello kitty";
+    print $val;
+    print "hello kitty1";
+    print "hello kitty123 ss";
     return 0;
 }
 
