@@ -155,7 +155,7 @@ def generate_stmt(ast, module, builder, func, variables):
         if "exp" in ast:
             exp = generate_exp(ast["exp"], module, builder, variables)
             if exp.type.is_pointer:
-                builder.load(exp)
+                exp = builder.load(exp)
             builder.ret(exp)
         else:
             builder.ret_void()
