@@ -1,6 +1,5 @@
 from llvmlite import ir
 import llvmlite.binding as llvm
-import yaml
 import ctypes
 
 def generate_type(type):

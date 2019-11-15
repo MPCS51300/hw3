@@ -1,6 +1,5 @@
 import ply.yacc as yacc
 import lexer
-import yaml
 import json, sys
 
 tokens = lexer.tokens 
@@ -567,19 +566,18 @@ def check_run():
     if "run" not in funcs_declare:
         raise CompilerException("error: run function should be declared once.")
 
+# The function called by ekcc.py
 def parse(input_content):
     parser = yacc.yacc()
     result = parser.parse(input_content)
 
-    exitcode=0
-    #Compiler reports a reasonable error message & exit code.
+    #Compiler ruturns ( ast tree, error message) 
     try:
         check_violation(result)
         check_run()
     except CompilerException as e:
-        print(e.message)
-        return None
+        return (None, e.message)
 
-    return result
+    return (result, None)
 
     

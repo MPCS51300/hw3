@@ -24,24 +24,23 @@ parser.add_argument("-O", action="store_true", help="enable optimization")
 parser.add_argument("-emit-ast", action="store_true", default=False, help="generate AST")
 parser.add_argument("-emit-llvm", action="store_true", default=False, help="generate LLVM IR")
 parser.add_argument("-o", action="store", default=sys.stdout, help="set output file path")
+parser.add_argument("input_file", help = "ek file to be compiled")
 args, unknown = parser.parse_known_args()
 
 exitcode = 0
 
-if len(unknown) != 1:
-    raise Exception("Usage: python3 ekcc.py <input_file>")
-elif args.emit_ast and args.emit_llvm:
+if args.emit_ast and args.emit_llvm:
     raise Exception("Cannot emit_ast and emit_llvm at the same time")
 else:
-    content = read_content(unknown[0])
-    ast = yacc.parse(content)
-    if ast == None:
+    content = read_content(args.input_file)
+    ast, err_message = yacc.parse(content)
+    if err_message != None:
+        print(err_message)
         print("exit code: "+str(1))
         sys.exit(1)
     if args.emit_ast:
         write_to_file(args.o,  yaml.dump(ast))
     mod = codeGen.generate_code(ast)
-    #print(mod)
     mod = binding.compile_and_execute(mod)
     if args.emit_llvm:
         write_to_file(args.o, mod)
