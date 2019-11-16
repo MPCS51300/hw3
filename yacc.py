@@ -38,7 +38,7 @@ precedence = (
     ('left', 'SMALLERTHAN', 'GREATERTHAN'), 
     ('left', 'PLUS', 'MINUS'),
     ('left', 'TIMES', 'DIVIDE'),
-    ('right', 'NEGATE'),
+    ('right', 'NEGATE', 'UMINUS'),
  )
 
 def p_prog(p):
@@ -294,7 +294,7 @@ def p_logicOps(p):
 def p_uop(p):
     '''
     uop : NEGATE exp 
-        | MINUS exp
+        | MINUS exp %prec UMINUS
     '''
     if p[1]=='!':
         p[0] = {

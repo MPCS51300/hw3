@@ -37,7 +37,7 @@ def int run () {
   print $b;
   print $c;
 
-  # test1($a, $b, $c);
+  test1($a, $b, $c);
 
   print "final:";
   print $a;
