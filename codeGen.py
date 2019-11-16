@@ -2,6 +2,9 @@ from llvmlite import ir
 import llvmlite.binding as llvm
 import ctypes
 
+blocks = {} # key is index, value is the syntax to return the arg
+fblocks = {} # float # key is index, value is the syntax to return the arg
+
 def generate_type(typ):
     if typ == "int":
         return ir.IntType(32)
@@ -29,38 +32,57 @@ def generate_slit(string):
     c_str_val = ir.Constant(ir.ArrayType(ir.IntType(8), len(string)), bytearray(string.encode("utf8")))
     return c_str_val
 
-def generate_getarg(ast, module):
+def generate_arg(ast, module, undefined_args):
     # Declare function
     fnty = ir.FunctionType(generate_type("int"), [generate_type("int")])
-    func = ir.Function(module, fnty, name = "getarg")
+    func = ir.Function(module, fnty, name = "arg")
     entry = func.append_basic_block("entry")
     builder = ir.IRBuilder(entry)
 
-    # Implement getarg
-    arg = builder.alloca(generate_type("int"))
-    builder.store(func.args[0], arg)
-    arg_value = builder.load(arg)
-    builder.ret(arg_value)
+    # dummy switch else, switch end
+    bbelse = builder.append_basic_block("switch.else")
+    bbend = builder.append_basic_block("switch.end")
+    switch = builder.switch(func.args[0], bbelse)
+    with builder.goto_block(bbelse):
+        builder.ret(ir.Constant(generate_type("int"), 0))
+    with builder.goto_block(bbend):
+        builder.ret(ir.Constant(generate_type("int"), 0))
 
-def generate_getargf(ast, module):
+    # build switch blocks
+    for idx, arg in enumerate(undefined_args):
+        bbi = builder.append_basic_block("switch.%d" % idx)
+        switch.add_case(idx, bbi)
+        with builder.goto_block(bbi):
+            builder.ret(ir.Constant(generate_type("int"), int(arg)))
+
+def generate_argf(ast, module, undefined_args):
     # Declare function
     fnty = ir.FunctionType(generate_type("float"), [generate_type("int")])
-    func = ir.Function(module, fnty, name = "getargf")
+    func = ir.Function(module, fnty, name = "argf")
     entry = func.append_basic_block("entry")
     builder = ir.IRBuilder(entry)
 
-    # Implement getargf
-    arg = builder.alloca(generate_type("int"))
-    builder.store(func.args[0], arg)
-    arg_value = builder.load(arg)
-    arg_value = builder.uitofp(arg_value, ir.FloatType())
-    builder.ret(arg_value)
+    # dummy switch else, switch end
+    bbelse = builder.append_basic_block("switch.else")
+    bbend = builder.append_basic_block("switch.end")
+    switch = builder.switch(func.args[0], bbelse)
+    with builder.goto_block(bbelse):
+        builder.ret(ir.Constant(generate_type("float"), float(0)))
+    with builder.goto_block(bbend):
+        builder.ret(ir.Constant(generate_type("float"), float(0)))
 
-def generate_extern(ast, module):
-    if ast["globid"] == "getarg":
-        generate_getarg(ast, module)
-    elif ast["globid"] == "getargf":
-        generate_getargf(ast, module)
+    # build switch blocks
+    for idx, arg in enumerate(undefined_args):
+        bbi = builder.append_basic_block("switch.%d" % idx)
+        switch.add_case(idx, bbi)
+        with builder.goto_block(bbi):
+            builder.ret(ir.Constant(generate_type("float"), float(arg)))
+
+def generate_extern(ast, module, undefined_args):
+    if ast["globid"] == "arg":
+        generate_arg(ast, module, undefined_args)
+    elif ast["globid"] == "argf":
+        generate_argf(ast, module, undefined_args)
     else:  
         args = []
         ret_type = generate_type(ast["ret_type"])
@@ -71,10 +93,10 @@ def generate_extern(ast, module):
         fnty = ir.FunctionType(ret_type, args)
         func = ir.Function(module, fnty, name=ast["globid"])
 
-def generate_externs(ast, module):
+def generate_externs(ast, module, undefined_args):
     if "externs" in ast:
         for extern in ast["externs"]:
-            generate_extern(extern, module)
+            generate_extern(extern, module, undefined_args)
 
 def generate_binop(ast, module, builder, variables):
     op = ast["op"]
@@ -295,9 +317,9 @@ def generate_funcs(ast, module):
     for func in ast["funcs"]:
         generate_func(func, module)
 
-def generate_prog(ast, module):
+def generate_prog(ast, module, undefined_args):
     if "externs" in ast and len(ast) > 1:
-        generate_externs(ast["externs"], module)
+        generate_externs(ast["externs"], module, undefined_args)
 
     generate_funcs(ast["funcs"], module)
 
@@ -325,6 +347,6 @@ def declare_printf(module):
 def generate_code(ast, undefined_args):
     module = ir.Module(name="prog")
     declare_printf(module)
-    generate_prog(ast, module)
+    generate_prog(ast, module, undefined_args)
     return module
 

@@ -1,7 +1,7 @@
 #
 
-extern int getarg(int);
-extern float getargf(int);
+extern int arg(int);
+extern float argf(int);
 
 def int fib (int $n) {
     if ($n < 1)
@@ -25,12 +25,11 @@ def void things (ref int $n) {
 }
 
 def int run () {
-    # float $a = getargf(0);
-    # float $b = getargf(1);
-    # int $c = getarg(2);
-    # print $a;
-    # print $b;
-    # print $c;
+    # Check arg, argf
+    int $a = arg(0);
+    print $a;
+    float $b = argf(1);
+    print $b;
 
     # Check casting
     int $d = 1;
