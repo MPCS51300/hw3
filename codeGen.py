@@ -29,7 +29,7 @@ def generate_type(typ):
         return ir.PointerType(ir.IntType(8))
 
 def generate_slit(string):
-    c_str_val = ir.Constant(ir.ArrayType(ir.IntType(8), len(string)), bytearray(string.encode("utf8")))
+    c_str_val = ir.Constant(ir.ArrayType(ir.IntType(8), len(string)),  bytearray(string.encode("utf8")))
     return c_str_val
 
 def generate_arg(ast, module, undefined_args):
@@ -127,6 +127,8 @@ def generate_binop(ast, module, builder, variables):
                 if op == "lt":
                     return builder.fcmp_ordered("<", lhs, rhs)
                 elif op == "gt":
+                    print(lhs)
+                    print(rhs)
                     return builder.fcmp_ordered(">", lhs, rhs)
                 elif op == "eq":
                     return builder.fcmp_ordered("==", lhs, rhs)
@@ -234,7 +236,7 @@ def generate_stmt(ast, module, builder, func, variables):
             builder.ret(exp)
         else:
             builder.ret_void()
-    elif name == "vardeclstmt": 
+    elif name == "vardeclstmt":
         variables[ast["vdecl"]["var"]] = builder.alloca(generate_type(ast["vdecl"]["type"]))
         builder.store(generate_exp(ast["exp"], module, builder, variables), variables[ast["vdecl"]["var"]])
     elif name == "expstmt":
@@ -256,14 +258,24 @@ def generate_stmt(ast, module, builder, func, variables):
     elif name == "print":
         value = generate_exp(ast["exp"], module, builder, variables)
         if value.type.is_pointer:
-            value = builder.load(value)
+            if value.type == ir.PointerType(ir.FloatType()):
+                global_fmt = module.get_global("fstr_float")
+            else:
+                global_fmt = module.get_global("fstr_int")
+            # value = builder.load(value)
+            # value  = builder.fpext(value, ir.DoubleType(), name='s')
+            # print(value)
         elif value.type == ir.IntType(1):
             if value.constant == True:
                 value = ir.Constant(generate_type("int"), 1)
             else:
                 value = ir.Constant(generate_type("int"), 0)
+            global_fmt = module.get_global("fstr_int")
+        elif value.type == generate_type("int"):
+            global_fmt = module.get_global("fstr_int")
+        else:
+            global_fmt = module.get_global("fstr_float")
         printf_func = module.get_global("printf")
-        global_fmt = module.get_global("fstr_int")
         voidptr_ty = ir.IntType(8).as_pointer()
         fmt_arg = builder.bitcast(global_fmt, voidptr_ty)
         #call printf function
@@ -348,6 +360,13 @@ def declare_printf(module):
     global_fmt2.linkage = 'internal'
     global_fmt2.global_constant = True
     global_fmt2.initializer = c_fmt2
+    #float type
+    fmt3 = "%f\n\0"
+    c_fmt3 = ir.Constant(ir.ArrayType(ir.IntType(8), len(fmt3)), bytearray(fmt3.encode("utf8")))
+    global_fmt3 = ir.GlobalVariable(module, c_fmt3.type, name="fstr_float")
+    global_fmt3.linkage = 'internal'
+    global_fmt3.global_constant = True
+    global_fmt3.initializer = c_fmt3
 
 # The function called by ekcc.py
 def generate_code(ast, undefined_args):
