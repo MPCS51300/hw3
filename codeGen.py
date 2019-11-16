@@ -158,19 +158,25 @@ def generate_uop(ast, module, builder, variables):
         return builder.not_(generate_exp(ast["exp"], module, builder, variables))
     elif op == "minus":
         return builder.neg(generate_exp(ast["exp"], module, builder, variables))
-        
+
+def is_int(typ):
+    return "int" in typ
+
+def is_float(typ):
+    return "float" in typ
+
 def generate_caststmt(ast, module, builder, variables):
     typ = generate_type(ast["type"])
     exp = generate_exp(ast["exp"], module, builder, variables)
     if exp.type.is_pointer:
         exp = builder.load(exp)
-    if ast["type"] == "int" and ast["exp"]["exptype"] == "int":
+    if is_int(ast["type"]) and is_int(ast["exp"]["exptype"]):
         exp = builder.trunc(exp, ir.IntType(32))
-    elif ast["type"] == "int" and ast["exp"]["exptype"] == "float":
+    elif is_int(ast["type"]) and is_float(ast["exp"]["exptype"]):
         exp = builder.fptoui(exp, ir.IntType(32))
-    elif ast["type"] == "float" and ast["exp"]["exptype"] == "float":
+    elif is_float(ast["type"])and is_float(ast["exp"]["exptype"]):
         exp = builder.fptrunc(exp, ir.FloatType())
-    elif ast["type"] == "float" and ast["exp"]["exptype"] == "int":
+    elif is_float(ast["type"]) and is_int(ast["exp"]["exptype"]):
         exp = builder.uitofp(exp, ir.FloatType())
     return exp
 
