@@ -2,23 +2,27 @@ from llvmlite import ir
 import llvmlite.binding as llvm
 import ctypes
 
-def generate_type(type):
-    if type == "int":
+def generate_type(typ):
+    if typ == "int":
         return ir.IntType(32)
-    elif type == "float":
+    elif typ == "float":
         return ir.FloatType()
-    elif type == "void":
+    elif typ == "void":
         return ir.VoidType()
-    elif type == "bool":
+    elif typ == "bool":
         return ir.IntType(1)
-    elif "ref" in type:
-        if "int" in type:
+    elif "noalias ref" in typ:
+        # e.g., noalias ref int
+        segs = typ.split(" ")
+        return generate_type(segs[-1])
+    elif "ref" in typ:
+        if "int" in typ:
             return ir.PointerType(ir.IntType(32))
-        elif type == "float":
+        elif typ == "float":
             return ir.PointerType(ir.FloatType())
-        elif type == "bool":
+        elif typ == "bool":
             return ir.PointerType(ir.IntType(1))
-    elif type == "slit":
+    elif typ == "slit":
         return ir.PointerType(ir.IntType(8))
 
 def generate_slit(string):
@@ -318,7 +322,7 @@ def declare_printf(module):
     global_fmt2.initializer = c_fmt2
 
 # The function called by ekcc.py
-def generate_code(ast):
+def generate_code(ast, undefined_args):
     module = ir.Module(name="prog")
     declare_printf(module)
     generate_prog(ast, module)

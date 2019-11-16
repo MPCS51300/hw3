@@ -25,7 +25,7 @@ parser.add_argument("-emit-ast", action="store_true", default=False, help="gener
 parser.add_argument("-emit-llvm", action="store_true", default=False, help="generate LLVM IR")
 parser.add_argument("-o", action="store", default=sys.stdout, help="set output file path")
 parser.add_argument("input_file", help = "ek file to be compiled")
-args, unknown = parser.parse_known_args()
+args, undefined = parser.parse_known_args()
 
 exitcode = 0
 
@@ -40,7 +40,7 @@ else:
         sys.exit(1)
     if args.emit_ast:
         write_to_file(args.o,  yaml.dump(ast))
-    mod = codeGen.generate_code(ast)
+    mod = codeGen.generate_code(ast, undefined)
     mod = binding.compile_and_execute(mod)
     if args.emit_llvm:
         write_to_file(args.o, mod)
