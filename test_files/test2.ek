@@ -24,6 +24,10 @@ def float test1(noalias ref float $a, noalias ref float $b, float $c) {
     $b = 7.2;
   }
 
+  $a = 4.0;
+  $b = 5.0;
+  $c = 6.0;
+
   return $c;
 }
 

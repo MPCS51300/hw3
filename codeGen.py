@@ -14,10 +14,6 @@ def generate_type(typ):
         return ir.VoidType()
     elif typ == "bool":
         return ir.IntType(1)
-    elif "noalias ref" in typ:
-        # e.g., noalias ref int
-        segs = typ.split(" ")
-        return generate_type(segs[-1])
     elif "ref" in typ:
         if "int" in typ:
             return ir.PointerType(ir.IntType(32))
@@ -255,6 +251,8 @@ def generate_stmt(ast, module, builder, func, variables):
             builder.ret_void()
     elif name == "vardeclstmt": 
         variables[ast["vdecl"]["var"]] = builder.alloca(generate_type(ast["vdecl"]["type"]))
+        if "noalias" in ast["vdecl"]["type"]:
+            variables[ast["vdecl"]["var"]].add_attribute("noalias")
         exp = generate_exp(ast["exp"], module, builder, variables)
         if exp.type.is_pointer:
             exp = builder.load(exp)
@@ -332,6 +330,12 @@ def generate_func(ast, module):
     fnty = ir.FunctionType(ret_type, args_types)
     func = ir.Function(module, fnty, name=ast["globid"])
 
+    # add_attribute("noalias")
+    if "vdecls" in ast:
+        for idx, vdecl in enumerate(ast["vdecls"]["vars"]):
+            if "noalias" in vdecl:
+                func.args[idx].add_attribute("noalias")
+    
     # Adds entry block to the function
     entry_block = func.append_basic_block(name="entry")
     builder = ir.IRBuilder(entry_block)

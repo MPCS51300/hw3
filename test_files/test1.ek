@@ -33,24 +33,21 @@ def int run () {
 
     # Check casting
     int $d = 1;
-    print "$d";
-    print $d;
-    # float $e = [float] $d;
-    # print "$e";
-    # print $e;
+    print $d; # should be 1
+    float $e = [float] $d;
+    print $e; # should be 1.0000
 
     # Check casting
-    float $e = 2.2;
-    print "$e";
-    print $e;
+    $e = 2.2;
+    print $e; # should be 2.2000
     $d = [int] $e;
-    print "$d";
-    print $d;
+    print $d; # should be 2
 
-    # Check noalias working?
-    noalias ref int $f = 1;
+    # Check ref int working?
+    ref int $f = $d;
+    print $f; # should be 2
     inc($f);
-    print $f;
+    print $f; # should be 3
 
     int $val = fib(5);
     inc($val);
