@@ -5,6 +5,20 @@ import ctypes
 blocks = {} # key is index, value is the syntax to return the arg
 fblocks = {} # float # key is index, value is the syntax to return the arg
 
+def load_var(builder, pointer):
+    while pointer.type.is_pointer:
+        pointer = builder.load(pointer)
+    return pointer
+
+def get_pointer(builder, pointer):
+    if not pointer.type.is_pointer:
+        return pointer
+    next_pointer = builder.load(pointer)
+    while pointer.type.is_pointer and next_pointer.type.is_pointer:
+        pointer = builder.load(pointer)
+        next_pointer = builder.load(pointer)
+    return pointer
+
 def generate_type(typ):
     if typ == "int":
         return ir.IntType(32)
@@ -101,10 +115,12 @@ def generate_binop(ast, module, builder, variables):
     lhs = generate_exp(ast["lhs"], module, builder, variables)
     rhs = generate_exp(ast["rhs"], module, builder, variables)
     # load if it is a pointer
-    if lhs.type.is_pointer:
-        lhs = builder.load(lhs)
-    if rhs.type.is_pointer:
-        rhs = builder.load(rhs)
+    # if lhs.type.is_pointer:
+    #     lhs = builder.load(lhs)
+    # if rhs.type.is_pointer:
+    #     rhs = builder.load(rhs)
+    lhs = load_var(builder, lhs)
+    rhs = load_var(builder, rhs)
 
     if exptype == "bool":
         if op == "and":
@@ -154,8 +170,9 @@ def generate_uop(ast, module, builder, variables):
         return builder.not_(generate_exp(ast["exp"], module, builder, variables))
     elif op == "minus":
         exp = generate_exp(ast["exp"], module, builder, variables)
-        if exp.type.is_pointer:
-            exp = builder.load(exp)
+        # if exp.type.is_pointer:
+        #     exp = builder.load(exp)
+        exp = load_var(builder, exp)
         if ast["exptype"] == "float":
             return builder.fsub(ir.Constant(generate_type("float"), 0.0), exp)
         elif ast["exptype"] == "int":
@@ -170,8 +187,9 @@ def is_float(typ):
 def generate_caststmt(ast, module, builder, variables):
     typ = generate_type(ast["type"])
     exp = generate_exp(ast["exp"], module, builder, variables)
-    if exp.type.is_pointer:
-        exp = builder.load(exp)
+    # if exp.type.is_pointer:
+    #     exp = builder.load(exp)
+    exp = load_var(builder, exp)
     if is_int(ast["type"]) and is_int(ast["exp"]["exptype"]):
         exp = builder.trunc(exp, ir.IntType(32))
     elif is_int(ast["type"]) and is_float(ast["exp"]["exptype"]):
@@ -184,8 +202,9 @@ def generate_caststmt(ast, module, builder, variables):
 
 def generate_assign(ast, module, builder, variables):
     exp = generate_exp(ast["exp"], module, builder, variables)
-    if exp.type.is_pointer:
-        exp = builder.load(exp)
+    # if exp.type.is_pointer:
+    #     exp = builder.load(exp)
+    exp = load_var(builder, exp)
     builder.store(exp, variables[ast["var"]])
 
 def generate_funccall(ast, module, builder, variables):
@@ -199,14 +218,20 @@ def generate_funccall(ast, module, builder, variables):
         
         # Customize arg to the desired type
         for idx, arg, fn_arg in zip(list(range(len(args))), args, fn.args):
+            arg = get_pointer(builder, arg)
             if type(arg.type) == type(fn_arg.type):
-                pass
+                args[idx] = arg
             else:
                 if fn_arg.type.is_pointer:
-                    args[idx] = arg.as_pointer
+                    if arg.type.is_pointer:
+                        args[idx] = arg
+                    else:
+                        args[idx] = arg.as_pointer
                 else:
-                    args[idx] = builder.load(arg)
-
+                    if arg.type.is_pointer:
+                        args[idx] = builder.load(arg)
+                    else:
+                        args[idx] = arg
     return builder.call(fn, args)
 
 def generate_exp(ast, module, builder, variables):
@@ -244,8 +269,9 @@ def generate_stmt(ast, module, builder, func, variables):
     elif name == "ret":
         if "exp" in ast:
             exp = generate_exp(ast["exp"], module, builder, variables)
-            if exp.type.is_pointer:
-                exp = builder.load(exp)
+            # if exp.type.is_pointer:
+            #     exp = builder.load(exp)
+            exp = load_var(builder, exp)
             builder.ret(exp)
         else:
             builder.ret_void()
@@ -254,7 +280,7 @@ def generate_stmt(ast, module, builder, func, variables):
         if "noalias" in ast["vdecl"]["type"]:
             variables[ast["vdecl"]["var"]].add_attribute("noalias")
         exp = generate_exp(ast["exp"], module, builder, variables)
-        if exp.type.is_pointer:
+        if "ref" not in ast["vdecl"]["type"] and exp.type.is_pointer:
             exp = builder.load(exp)
         builder.store(exp, variables[ast["vdecl"]["var"]])
     elif name == "expstmt":
@@ -276,13 +302,12 @@ def generate_stmt(ast, module, builder, func, variables):
     elif name == "print":
         value = generate_exp(ast["exp"], module, builder, variables)
         if value.type.is_pointer:
-            if value.type == ir.PointerType(ir.FloatType()):
+            value = load_var(builder, value)
+            if value.type == ir.FloatType():
                 global_fmt = module.get_global("fstr_float")
-                value = builder.load(value)
                 value = builder.fpext(value, ir.DoubleType(), name='float_double')
             else:
                 global_fmt = module.get_global("fstr_int")
-                value = builder.load(value)
         elif value.type == ir.IntType(1):
             if value.constant == True:
                 value = ir.Constant(generate_type("int"), 1)
