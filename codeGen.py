@@ -280,7 +280,7 @@ def generate_stmt(ast, module, builder, func, variables):
         variables[ast["vdecl"]["var"]] = builder.alloca(exp.type)
         if "noalias" in ast["vdecl"]["type"]:
             variables[ast["vdecl"]["var"]].add_attribute("noalias")
-        if "ref" not in ast["vdecl"]["type"] and exp.type.is_pointer:
+        if "ref" not in ast["vdecl"]["type"]:
             exp = load_var(builder, exp)
         builder.store(exp, variables[ast["vdecl"]["var"]])
     elif name == "expstmt":
