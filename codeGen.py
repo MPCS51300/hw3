@@ -306,16 +306,16 @@ def generate_stmt(ast, module, builder, func, variables):
             if value.type == ir.FloatType():
                 global_fmt = module.get_global("fstr_float")
                 value = builder.fpext(value, ir.DoubleType(), name='float_double')
-            else:
+            elif value.type == ir.IntType(32):
                 global_fmt = module.get_global("fstr_int")
+            elif value.type == ir.IntType(1):
+                global_fmt = module.get_global("fstr_int")
+                value = builder.zext(value, ir.IntType(32), name='bool_int')
+        elif value.type == ir.IntType(32):
+            global_fmt = module.get_global("fstr_int")
         elif value.type == ir.IntType(1):
-            if value.constant == True:
-                value = ir.Constant(generate_type("int"), 1)
-            else:
-                value = ir.Constant(generate_type("int"), 0)
             global_fmt = module.get_global("fstr_int")
-        elif value.type == generate_type("int"):
-            global_fmt = module.get_global("fstr_int")
+            value = builder.zext(value, ir.IntType(32), name='bool_int')
         else:
             global_fmt = module.get_global("fstr_float")
             value = builder.fpext(value, ir.DoubleType(), name='float_double')
