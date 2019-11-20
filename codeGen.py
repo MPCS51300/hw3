@@ -2,9 +2,6 @@ from llvmlite import ir
 import llvmlite.binding as llvm
 import ctypes
 
-blocks = {} # key is index, value is the syntax to return the arg
-fblocks = {} # float # key is index, value is the syntax to return the arg
-
 def load_var(builder, pointer):
     while pointer.type.is_pointer:
         pointer = builder.load(pointer)
